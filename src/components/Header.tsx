@@ -1,22 +1,8 @@
 export default function Header() {
   return (
-    <header className="relative p-8 rounded-b-[3rem] shadow-2xl overflow-hidden min-h-[160px] flex items-center">
-      {/* Background Image dengan Blur */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: "url('/header.jpg')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(4px) brightness(0.6)'
-        }}
-      />
-      
-      {/* Overlay Warna Biru OeL */}
-      <div className="absolute inset-0 bg-blue-700/40 mix-blend-multiply z-10" />
-
+    <header className="bg-blue-600 p-8 rounded-b-[3rem] shadow-2xl min-h-[160px] flex items-center">
       {/* Konten Header */}
-      <div className="relative z-20 max-w-5xl mx-auto flex items-center gap-6 w-full">
+      <div className="max-w-5xl mx-auto flex items-center gap-6 w-full">
         <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl rotate-3 overflow-hidden">
           <img src="/logo-oel.jpg" alt="Logo OeL" className="w-12 h-12 object-contain" />
         </div>
