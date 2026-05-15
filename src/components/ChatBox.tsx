@@ -1,23 +1,22 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from 'react-markdown';
- 
+
 interface ChatBoxProps {
   level: string | null;
   initialProblem: string | null;
 }
- 
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
- 
+
 export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
- 
-  // Fungsi fetch yang berdiri sendiri, tidak perlu useCallback
+
   const fetchReply = async (text: string, currentLevel: string) => {
     setIsLoading(true);
     try {
@@ -37,25 +36,21 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
       setIsLoading(false);
     }
   };
- 
-  // Handler untuk form submit manual
+
   const handleSendMessage = async (text: string) => {
     if (!level || isLoading) return;
     setMessages(prev => [...prev, { role: "user", content: text }]);
     await fetchReply(text, level);
   };
- 
-  // Auto-scroll setiap ada pesan baru
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
- 
-  // Trigger otomatis saat initialProblem dipilih
-  // Menggunakan ref untuk mencegah double-call di Strict Mode
+
   const triggeredRef = useRef<string | null>(null);
- 
+
   useEffect(() => {
     const key = `${level}__${initialProblem}`;
     if (level && initialProblem && triggeredRef.current !== key) {
@@ -65,9 +60,10 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
       fetchReply(prompt, level);
     }
   }, [initialProblem, level]);
- 
+
   return (
-    <div className="bg-[#1e1e1e] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+    /* Menyesuaikan tinggi agar lebih dinamis di mobile dengan h-full atau h-[calc(100vh-...] */
+    <div className="bg-[#1e1e1e] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col h-full">
       <div className="bg-[#252525] p-4 border-b border-white/5 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -85,10 +81,11 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           Bersihkan Chat
         </button>
       </div>
- 
+
       <div
         ref={scrollRef}
-        className="h-[450px] overflow-y-auto p-6 space-y-6 bg-[#161616] scroll-smooth custom-scrollbar"
+        /* Menggunakan flex-1 agar area chat mengambil sisa ruang yang tersedia */
+        className="flex-1 min-h-[300px] lg:h-[450px] overflow-y-auto p-6 space-y-6 bg-[#161616] scroll-smooth custom-scrollbar"
       >
         {messages.map((m, i) => (
           <div
@@ -117,7 +114,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
             </div>
           </div>
         ))}
- 
+
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-white/5 flex gap-1.5">
@@ -128,7 +125,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           </div>
         )}
       </div>
- 
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -139,7 +136,11 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
             input.value = "";
           }
         }}
-        className="p-4 bg-[#1e1e1e] border-t border-white/5 flex gap-2"
+        /* UPDATE PENTING: 
+           pb-24: memberikan jarak di bawah form saat mobile agar tidak tertutup Bottom Nav
+           lg:pb-4: mengembalikan ke padding normal di layar desktop
+        */
+        className="p-4 bg-[#1e1e1e] border-t border-white/5 flex gap-2 pb-24 lg:pb-4"
       >
         <input
           name="input"
