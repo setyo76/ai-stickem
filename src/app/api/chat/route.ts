@@ -1,42 +1,64 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.AI_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
     const { message, level } = await req.json();
 
-    // DAFTAR MODEL DARI YANG TERBARU KE YANG PALING STABIL
-    // Jika 3.1 sibuk, kita coba 2.5. Jika 2.5 sibuk, kita coba 1.5-flash-latest
-    const modelNames = ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash-latest"];
-    
-    let lastError = "";
-    
+    const apiKey = process.env.AI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ reply: "API key tidak ditemukan." });
+    }
+
+    const systemPrompt = `Kamu adalah AI Stickem Debugger Ora et Labora. Level: ${level}. Bantu siswa Stick'Em debugging robot dengan ramah, singkat, dan jelas.`;
+
+    // Coba model satu per satu
+    const modelNames = [
+      'gemini-2.5-flash-lite-preview-06-17',
+      'gemini-2.5-flash-preview-05-20',
+      'gemini-2.5-flash',
+    ];
+
+    let lastError = '';
+
     for (const modelName of modelNames) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        
-        const systemPrompt = `Kamu adalah AI Stickem Debugger Ora et Labora. Level: ${level}. Bantu siswa Stick'Em dengan ramah.`;
-        const result = await model.generateContent(`${systemPrompt}\n\nPertanyaan: ${message}`);
-        const response = await result.response;
-        
-        // Jika berhasil, langsung kirim jawaban
-        return NextResponse.json({ reply: response.text() });
-        
-      } catch (err: any) {
-        lastError = err.message;
-        if (err.message.includes("503") || err.message.includes("429")) {
-          console.log(`Model ${modelName} sibuk, mencoba model cadangan...`);
-          continue; // Coba model berikutnya di list
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ role: 'user', parts: [{ text: message }] }],
+            }),
+          }
+        );
+
+        if (!res.ok) {
+          const errData = await res.json();
+          lastError = errData?.error?.message || res.statusText;
+          console.log(`Model ${modelName} gagal: ${lastError}`);
+          continue;
         }
-        throw err; // Jika error lain (misal API Key salah), langsung stop
+
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Tidak ada respons.";
+        return NextResponse.json({ reply });
+
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err.message : String(err);
+        continue;
       }
     }
 
-    return NextResponse.json({ reply: `Waduh, semua asisten AI sedang sibuk melayani siswa lain. Coba klik lagi dalam 5 detik ya! (Error: ${lastError})` });
+    return NextResponse.json({ reply: `DEBUG semua model gagal: ${lastError}` });
 
-  } catch (error: any) {
-    return NextResponse.json({ reply: "Ada kendala teknis. Pastikan koneksi internet aman." }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Critical Error:', errorMessage);
+    return NextResponse.json(
+      { reply: `DEBUG: ${errorMessage}` },
+      { status: 500 }
+    );
   }
 }

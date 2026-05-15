@@ -3,6 +3,7 @@ export interface Level {
   title: string;
   subtitle: string;
   color: string;
+  isActive?: boolean;
 }
 
 export interface Message {
