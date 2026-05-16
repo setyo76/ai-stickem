@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       if (propertiJawaban?.rich_text?.length > 0) {
         aiReply = propertiJawaban.rich_text[0].plain_text;
       } else {
-        aiReply = `Saya menemukan kendala **${kataKunci}** di database, namun kolom Jawaban pada Notion masih kosong.`;
+        aiReply = `Saya menemukan kendala **${kataKunci}** di database, namun belum menemukan jawaban yang paling tepat. Ditunggu ke depannya ya.`;
       }
     } else {
       aiReply =

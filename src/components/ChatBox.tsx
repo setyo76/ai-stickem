@@ -7,7 +7,7 @@ const QUICK_PROBLEMS = [
   "Sensor tidak terbaca", 
   "Motor tidak jalan", 
   "OLED blank", 
-  "Program aneh",
+  "Robot/Servos tidak bisa berhenti",
   "Robot mobil tidak berjalan"
 ];
 
@@ -32,17 +32,15 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }, // Memastikan header JSON terkirim
-        body: JSON.stringify({ message: text, level: currentLevel }), // Membawa payload 'message'
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, level: currentLevel }),
       });
       
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // MENYESUAIKAN: Menggunakan data.message sesuai format return dari backend API
         setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
       } else {
-        // Jika backend merespon error (misal status 500), tampilkan alasan errornya ke chatbox
         setMessages(prev => [...prev, { 
           role: "assistant", 
           content: `⚠️ **Gagal menyimpan:** ${data.error || "Terjadi kesalahan pada server."}` 
@@ -106,7 +104,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
                 type="button"
                 disabled={isLoading}
                 onClick={() => handleSendMessage(problem)}
-                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 wrap-break-word text-left md:text-center max-w-full disabled:opacity-50"
+                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 text-left md:text-center max-w-full disabled:opacity-50"
               >
                 {problem}
               </button>
@@ -148,18 +146,19 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               key={i}
               className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full min-w-0`}
             >
-              <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-all overflow-hidden shrink ${
+              <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-words overflow-hidden shrink ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-[#2a2a2a] text-gray-200 border border-white/5 rounded-tl-none'
               }`}>
                 {m.role === 'user' ? (
-                  <span className="wrap-break-word">{m.content}</span>
+                  <span className="break-words">{m.content}</span>
                 ) : (
-                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 wrap-break-word wrap-break-word
+                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 break-words
                     prose-strong:text-amber-400 prose-p:my-2 prose-li:my-1
-                    prose-code:text-emerald-400 prose-code:bg-black/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:break-all
-                    prose-pre:bg-black/50 prose-pre:p-3 prose-pre:rounded-xl prose-pre:overflow-x-auto prose-pre:max-w-full">
+                    prose-code:text-emerald-400 prose-code:bg-black/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:break-words
+                    prose-pre:bg-black/50 prose-pre:p-3 prose-pre:rounded-xl prose-pre:overflow-x-auto prose-pre:max-w-full
+                    prose-hr:border-white/10 prose-em:text-gray-400">
                     <ReactMarkdown>{m.content}</ReactMarkdown>
                   </div>
                 )}

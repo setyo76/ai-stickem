@@ -4,6 +4,6 @@ export const QUICK_PROBLEMS = [
   "Sensor tidak terbaca", 
   "Motor tidak jalan", 
   "OLED blank", 
-  "Program aneh",
+  "Robot/Servos tidak bisa berhenti",
   "Robot mobil tidak berjalan"
 ];
