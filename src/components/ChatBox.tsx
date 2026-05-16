@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from 'react-markdown';
 
-// Daftar masalah cepat
 const QUICK_PROBLEMS = [
   "Tidak bisa belok", 
   "Sensor tidak terbaca", 
@@ -71,12 +70,11 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
   }, [initialProblem, level]);
 
   return (
-    /* Perubahan Utama: Tambahkan w-full dan overflow-x-hidden untuk mencegah scroll horizontal */
-    <div className="flex flex-col h-full gap-6 w-full max-w-full overflow-x-hidden">
+    /* FIXED: Menambahkan max-w-full, overflow-x-hidden, dan min-w-0 agar flexbox anak patuh */
+    <div className="flex flex-col h-full gap-6 w-full max-w-full overflow-x-hidden min-w-0">
       
       {/* ── SECTION PILIH MASALAH CEPAT ── */}
-      <div className="relative bg-white rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 shadow-2xl overflow-hidden border border-white/10 w-full">
-        {/* Background Image */}
+      <div className="relative bg-white rounded-4xl md:rounded-[2.5rem] p-5 md:p-8 shadow-2xl overflow-hidden border border-white/10 w-full min-w-0">
         <div 
           className="absolute inset-0 z-0 opacity-40 pointer-events-none"
           style={{
@@ -86,18 +84,18 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           }}
         />
         
-        <div className="relative z-10">
+        <div className="relative z-10 w-full min-w-0">
           <p className="text-[10px] md:text-[11px] font-black text-blue-700 uppercase tracking-[0.25em] mb-4 md:mb-5 ml-1">
             Pilih Masalah Cepat:
           </p>
           
-          {/* Flex-wrap dipastikan aman untuk mobile */}
-          <div className="flex flex-wrap gap-2 md:gap-3">
+          <div className="flex flex-wrap gap-2 md:gap-3 w-full">
             {QUICK_PROBLEMS.map((problem) => (
               <button
                 key={problem}
                 onClick={() => handleSendMessage(problem)}
-                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-full text-[10px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                /* FIXED: Hapus whitespace-nowrap, ganti ke break-words agar jika teks tombol kepanjangan di HP kecil, ia otomatis ganti baris secara rapi */
+                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 wrap-break-word text-left md:text-center max-w-full"
               >
                 {problem}
               </button>
@@ -107,12 +105,13 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
       </div>
 
       {/* ── AREA CHAT UTAMA ── */}
-      <div className="bg-[#1e1e1e] rounded-[2rem] md:rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden flex flex-col flex-1 min-h-[450px] w-full">
+      <div className="bg-[#1e1e1e] rounded-4xl md:rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden flex flex-col flex-1 min-h-112.5 w-full min-w-0">
+        
         {/* Header Chatbox */}
-        <div className="bg-[#252525] p-4 md:p-5 border-b border-white/5 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-400">
+        <div className="bg-[#252525] p-4 md:p-5 border-b border-white/5 flex justify-between items-center w-full min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0"></div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-400 truncate">
               AI Assistant — {level ?? "Umum"}
             </span>
           </div>
@@ -121,7 +120,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               setMessages([]);
               triggeredRef.current = null;
             }}
-            className="text-[9px] md:text-[10px] font-bold text-gray-500 hover:text-red-400 px-2 md:px-3 py-1 rounded-lg transition-all uppercase"
+            className="text-[10px] font-bold text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg transition-all uppercase shrink-0"
           >
             Bersihkan
           </button>
@@ -130,25 +129,27 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
         {/* Scrollable Messages */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-[#161616] scroll-smooth custom-scrollbar w-full"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-6 bg-[#161616] scroll-smooth custom-scrollbar w-full min-w-0"
         >
           {messages.map((m, i) => (
             <div
               key={i}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-3 w-full`}
+              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full min-w-0`}
             >
-              {/* max-w ditingkatkan agar teks tidak terlalu sempit di HP, word-break ditambahkan */}
-              <div className={`max-w-[90%] md:max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-words ${
+              {/* FIXED: Ditambahkan flex-shrink, break-all, dan overflow-hidden */}
+              <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-all overflow-hidden shrink ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-[#2a2a2a] text-gray-200 border border-white/5 rounded-tl-none'
               }`}>
                 {m.role === 'user' ? (
-                  m.content
+                  <span className="wrap-break-word">{m.content}</span>
                 ) : (
-                  <div className="prose prose-invert prose-sm max-w-none
+                  /* FIXED: Menambahkan modifikasi ketat pada layout prose-code dan prose-pre agar wajib overflow-scroll mandiri di dalam balon chat */
+                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 wrap-break-wordbreak-words
                     prose-strong:text-amber-400 prose-p:my-2 prose-li:my-1
-                    prose-code:text-emerald-400 prose-code:bg-black/30 prose-code:px-1 prose-code:rounded break-words">
+                    prose-code:text-emerald-400 prose-code:bg-black/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:break-all
+                    prose-pre:bg-black/50 prose-pre:p-3 prose-pre:rounded-xl prose-pre:overflow-x-auto prose-pre:max-w-full">
                     <ReactMarkdown>{m.content}</ReactMarkdown>
                   </div>
                 )}
@@ -178,8 +179,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               input.value = "";
             }
           }}
-          /* pb-24 untuk ruang jempol/navbar mobile, w-full untuk kepastian lebar */
-          className="p-4 md:p-5 bg-[#1e1e1e] border-t border-white/5 flex gap-2 md:gap-3 pb-24 lg:pb-6 w-full"
+          className="p-4 md:p-5 bg-[#1e1e1e] border-t border-white/5 flex gap-2 md:gap-3 pb-24 lg:pb-6 w-full min-w-0"
         >
           <input
             name="input"
@@ -191,7 +191,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white whitespace-nowrap"
+            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white shrink-0"
           >
             {isLoading ? '...' : 'KIRIM'}
           </button>
