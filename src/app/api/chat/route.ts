@@ -1,80 +1,87 @@
-import { NextResponse } from 'next/server';
+export const runtime = "nodejs";
+import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { message, level } = await req.json();
-
-    const apiKey = process.env.AI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ reply: "API key tidak ditemukan." });
+    const textData = await request.text();
+    if (!textData) {
+      return NextResponse.json({ success: false, error: "Body kosong." }, { status: 400 });
     }
 
-   const systemPrompt = `
-  Kamu adalah "Creative AI Assistant" untuk sekolah ORA et LABORA.
-  Tugas utamamu membantu siswa dalam proyek Stick'Em.
+    const body = JSON.parse(textData);
+    const message = body.message || "";
+    const level = body.level || "Umum";
 
-  LOGIKA TEKNIS KHUSUS OEL (WAJIB DIIKUTI):
-  1. Jika robot mobil tidak jalan: Ingatkan siswa cek kabel jumper ke board. Pastikan warna kabel sesuai dengan warna port (Color-to-Color).
-  2. Jika roda bergerak tapi tidak lurus: 
-     - Cek penempatan kabel servo.
-     - Roda KIRI harus di Port 1 dan Port 3.
-     - Roda KANAN harus di Port 2 dan Port 4.
-     - Penandaan: Board/Mesin dianggap sebagai bagian DEPAN mobil.
+    if (!message) {
+      return NextResponse.json({ success: false, error: "Pesan kosong." }, { status: 400 });
+    }
 
-  ATURAN TEGAS:
-  - Hanya jawab hal berkaitan dengan coding, aplikasi, robotika, atau sains.
-  - Jika di luar konteks, tolak dengan ramah khas OeL.
-  - Gunakan format Markdown (###, **, list) agar rapi.
-  - Tingkat kesulitan untuk level: ${level}.
-`;
+    const databaseId = process.env.NOTION_DATABASE_ID;
+    const notionToken = process.env.NOTION_TOKEN;
 
-    // Coba model satu per satu
-    const modelNames = [
-      'gemini-2.5-flash-lite-preview-06-17',
-      'gemini-2.5-flash-preview-05-20',
-      'gemini-2.5-flash',
-    ];
+    if (!databaseId || !notionToken) {
+      throw new Error("NOTION_DATABASE_ID atau NOTION_TOKEN belum diatur di .env.local");
+    }
 
-    let lastError = '';
+    let kataKunci = message;
+    if (message.includes("Masalah saya:")) {
+      const match = message.match(/Masalah saya:\s*([^.]+)/);
+      if (match) kataKunci = match[1].trim();
+    }
 
-    for (const modelName of modelNames) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ role: 'user', parts: [{ text: message }] }],
-            }),
-          }
-        );
+    // Gunakan fetch langsung ke Notion REST API
+    const notionRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${notionToken}`,
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filter: {
+          property: "Pertanyaan",
+          title: {
+            contains: kataKunci,
+          },
+        },
+      }),
+    });
 
-        if (!res.ok) {
-          const errData = await res.json();
-          lastError = errData?.error?.message || res.statusText;
-          console.log(`Model ${modelName} gagal: ${lastError}`);
-          continue;
-        }
+    if (!notionRes.ok) {
+      const errBody = await notionRes.text();
+      throw new Error(`Notion API error ${notionRes.status}: ${errBody}`);
+    }
 
-        const data = await res.json();
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Tidak ada respons.";
-        return NextResponse.json({ reply });
+    const responseNotion = await notionRes.json();
 
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : String(err);
-        continue;
+    let aiReply = "";
+
+    if (responseNotion.results && responseNotion.results.length > 0) {
+      const page = responseNotion.results[0];
+      const propertiJawaban = page.properties["Jawaban"];
+
+      if (propertiJawaban?.rich_text?.length > 0) {
+        aiReply = propertiJawaban.rich_text[0].plain_text;
+      } else {
+        aiReply = `Saya menemukan kendala **${kataKunci}** di database, namun kolom Jawaban pada Notion masih kosong.`;
       }
+    } else {
+      aiReply =
+        `### 🤖 Halo! Solusi Spesifik Belum Tersedia\n` +
+        `Sistem belum menemukan FAQ untuk kendala **"${kataKunci}"** di kelas **${level}**.\n\n` +
+        `**Saran penanganan awal:**\n` +
+        `1. **Periksa Kabel:** Pastikan sambungan tidak longgar.\n` +
+        `2. **Kesesuaian Pin:** Pastikan nomor pin di kode sama dengan fisik.\n` +
+        `3. Coba kata kunci lebih pendek: *Motor, Sensor, Jalur, Belok, atau OLED*.`;
     }
 
-    return NextResponse.json({ reply: `DEBUG semua model gagal: ${lastError}` });
+    return NextResponse.json({ success: true, message: aiReply });
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Critical Error:', errorMessage);
+    const errMsg = error instanceof Error ? error.message : "Kesalahan tidak diketahui.";
+    console.error("Error internal backend:", errMsg);
     return NextResponse.json(
-      { reply: `DEBUG: ${errorMessage}` },
+      { success: false, error: errMsg },
       { status: 500 }
     );
   }

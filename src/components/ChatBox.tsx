@@ -32,15 +32,26 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, level: currentLevel }),
+        headers: { "Content-Type": "application/json" }, // Memastikan header JSON terkirim
+        body: JSON.stringify({ message: text, level: currentLevel }), // Membawa payload 'message'
       });
+      
       const data = await response.json();
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
+
+      if (response.ok && data.success) {
+        // MENYESUAIKAN: Menggunakan data.message sesuai format return dari backend API
+        setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+      } else {
+        // Jika backend merespon error (misal status 500), tampilkan alasan errornya ke chatbox
+        setMessages(prev => [...prev, { 
+          role: "assistant", 
+          content: `⚠️ **Gagal menyimpan:** ${data.error || "Terjadi kesalahan pada server."}` 
+        }]);
+      }
     } catch (_error) {
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: "Waduh, sepertinya koneksi AI sedang bermasalah. Coba lagi ya!"
+        content: "Waduh, sepertinya koneksi jaringan sedang bermasalah. Coba lagi ya!"
       }]);
     } finally {
       setIsLoading(false);
@@ -70,7 +81,6 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
   }, [initialProblem, level]);
 
   return (
-    /* FIXED: Menambahkan max-w-full, overflow-x-hidden, dan min-w-0 agar flexbox anak patuh */
     <div className="flex flex-col h-full gap-6 w-full max-w-full overflow-x-hidden min-w-0">
       
       {/* ── SECTION PILIH MASALAH CEPAT ── */}
@@ -93,9 +103,10 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
             {QUICK_PROBLEMS.map((problem) => (
               <button
                 key={problem}
+                type="button"
+                disabled={isLoading}
                 onClick={() => handleSendMessage(problem)}
-                /* FIXED: Hapus whitespace-nowrap, ganti ke break-words agar jika teks tombol kepanjangan di HP kecil, ia otomatis ganti baris secara rapi */
-                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 wrap-break-word text-left md:text-center max-w-full"
+                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 wrap-break-word text-left md:text-center max-w-full disabled:opacity-50"
               >
                 {problem}
               </button>
@@ -112,10 +123,11 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-400 truncate">
-              AI Assistant — {level ?? "Umum"}
+              Notion FAQ Assistant — {level ?? "Umum"}
             </span>
           </div>
           <button
+            type="button"
             onClick={() => {
               setMessages([]);
               triggeredRef.current = null;
@@ -136,7 +148,6 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               key={i}
               className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full min-w-0`}
             >
-              {/* FIXED: Ditambahkan flex-shrink, break-all, dan overflow-hidden */}
               <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-all overflow-hidden shrink ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-none'
@@ -145,8 +156,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
                 {m.role === 'user' ? (
                   <span className="wrap-break-word">{m.content}</span>
                 ) : (
-                  /* FIXED: Menambahkan modifikasi ketat pada layout prose-code dan prose-pre agar wajib overflow-scroll mandiri di dalam balon chat */
-                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 wrap-break-wordbreak-words
+                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 wrap-break-word wrap-break-word
                     prose-strong:text-amber-400 prose-p:my-2 prose-li:my-1
                     prose-code:text-emerald-400 prose-code:bg-black/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:break-all
                     prose-pre:bg-black/50 prose-pre:p-3 prose-pre:rounded-xl prose-pre:overflow-x-auto prose-pre:max-w-full">
@@ -185,7 +195,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
             name="input"
             autoComplete="off"
             type="text"
-            placeholder="Tulis di sini..."
+            placeholder="Tulis kata kunci masalah di sini..."
             className="flex-1 bg-[#121212] border border-white/10 rounded-xl md:rounded-2xl px-4 py-3 md:px-5 md:py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/50 transition-all text-white placeholder:text-gray-600 min-w-0"
           />
           <button
