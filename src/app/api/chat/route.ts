@@ -2,56 +2,143 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Normalisasi alias umum
 function normalizeText(text: string): string {
+  if (!text) return "";
   return text
     .toLowerCase()
-    .replace(/stick\s*'?\s*em/gi, "stick em")
-    .replace(/stickem/gi, "stick em")
-    .replace(/stikem/gi, "stick em")
-    .replace(/[''`]/g, "'")
+    .replace(/stick\s*['\u2018\u2019`]?\s*em/gi, "stickem")
+    .replace(/['\u2018\u2019`]/g, "'")
+    .replace(/[?.,!]/g, "")
     .trim();
 }
 
-// Ekstrak frasa (prioritas panjang dulu, kata tunggal terakhir)
-function extractKeywords(text: string): string[] {
-  const stopwords = [
-    "apa", "itu", "yang", "dan", "di", "ke", "dari", "ini", "ada", "tidak",
-    "apakah", "bagaimana", "saya", "untuk", "dengan", "pada", "atau", "bisa",
-    "harus", "cek", "masalah", "kelas", "tolong", "mohon", "kenapa", "mengapa",
-    "gimana", "cara", "boleh", "sudah", "belum", "jika", "kalau", "saat",
-  ];
+function scoreMatch(query: string, pertanyaan: string): number {
+  const q = normalizeText(query);
+  const p = normalizeText(pertanyaan);
 
-  const normalized = normalizeText(text).replace(/[?.,!]/g, "");
-  const words = normalized
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !stopwords.includes(w));
+  if (!q || !p) return 0;
 
-  const phrases: string[] = [];
+  let score = 0;
 
-  // Prioritas 1: frasa 4 kata
-  for (let i = 0; i <= words.length - 4; i++) {
-    phrases.push(words.slice(i, i + 4).join(" "));
-  }
-  // Prioritas 2: frasa 3 kata
-  for (let i = 0; i <= words.length - 3; i++) {
-    phrases.push(words.slice(i, i + 3).join(" "));
-  }
-  // Prioritas 3: frasa 2 kata
-  for (let i = 0; i <= words.length - 2; i++) {
-    phrases.push(words.slice(i, i + 2).join(" "));
-  }
-  // Prioritas 4: kata tunggal panjang saja (min 5 huruf)
-  for (const w of words) {
-    if (w.length >= 5) phrases.push(w);
+  if (p === q) score += 100;
+  if (p.includes(q)) score += 50;
+  if (q.includes(p)) score += 40;
+
+  const qWords = q.split(/\s+/).filter(w => w.length > 1);
+  const pWords = p.split(/\s+/).filter(w => w.length > 1);
+
+  for (const qw of qWords) {
+    if (pWords.some(pw => pw === qw)) score += 10;
+    else if (pWords.some(pw => pw.includes(qw) || qw.includes(pw))) score += 5;
   }
 
-  return [...new Set(phrases)];
+  return score;
 }
 
-// Restore alias agar cocok dengan format di Notion
-function restoreAlias(text: string): string {
-  return text.replace(/stick em/gi, "Stick 'Em");
+type KonteksJawaban =
+  | "salam"
+  | "definisi"
+  | "masalah"
+  | "tutorial"
+  | "harga"
+  | "umum";
+
+function deteksiKonteks(pertanyaan: string): KonteksJawaban {
+  const q = (pertanyaan || "").toLowerCase().trim();
+
+  // Salam — kata pendek tanpa tanda tanya, tidak mengandung kata teknis
+  const isSalamMurni =
+    /^(halo|hai|hi|hello|hey|selamat pagi|selamat siang|selamat sore|selamat malam|pagi|siang|sore|malam|assalamualaikum|hola|yo|sup)[\s!.]*$/.test(q);
+  if (isSalamMurni) return "salam";
+
+  // Pertanyaan harga / langganan
+  if (/harga|biaya|bayar|berlangganan|beli|gratis|subscribe|free/.test(q)) return "harga";
+
+  // Pertanyaan masalah / troubleshooting
+  if (/tidak bisa|tidak jalan|tidak nyala|tidak muncul|tidak terbaca|tidak bergerak|tidak konek|tidak tersambung|error|mati|blank|rusak|gagal|kenapa|mengapa|tolong|help|bantuin|bantuan/.test(q)) return "masalah";
+
+  // Pertanyaan tutorial / cara melakukan sesuatu
+  if (/cara|langkah|bagaimana|gimana|mulai|buat|pasang|hubungkan|konek|install|setting|konfigurasi|upload|download|daftar|registrasi|login/.test(q)) return "tutorial";
+
+  // Pertanyaan definisi / pengertian
+  if (/apa itu|apa sih|apakah|pengertian|definisi|adalah|apa yang dimaksud|ceritakan|jelaskan|maksud|artinya|fungsi|kegunaan|manfaat/.test(q)) return "definisi";
+
+  return "umum";
+}
+
+function wrapReply(core: string, pertanyaan: string): string {
+  const konteks = deteksiKonteks(pertanyaan);
+
+  // Salam — tidak perlu pengantar atau closing, langsung jawab natural
+  if (konteks === "salam") {
+    return core;
+  }
+
+  let opening = "";
+  let closing  = "";
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+  switch (konteks) {
+
+    case "definisi":
+      opening = pick([
+        "Berikut penjelasannya:\n\n",
+        "Ini dia penjelasannya:\n\n",
+        "Baik, ini penjelasan singkatnya:\n\n",
+      ]);
+      closing = pick([
+        "\n\n---\n_Semoga penjelasan ini membantu ya! 😊_",
+        "\n\n---\n_Ada yang ingin ditanyakan lebih lanjut? 🙌_",
+      ]);
+      break;
+
+    case "masalah":
+      opening = pick([
+        "Tenang, ini yang perlu dicek:\n\n",
+        "Oke, ini langkah yang bisa dicoba:\n\n",
+        "Jangan panik! Coba ikuti langkah berikut:\n\n",
+      ]);
+      closing = pick([
+        "\n\n---\n_Semoga masalahnya teratasi ya. Tetap semangat! 💪_",
+        "\n\n---\n_Kalau masih ada kendala, tanya lagi ya. 🙌_",
+      ]);
+      break;
+
+    case "tutorial":
+      opening = pick([
+        "Oke! Silahkan ikuti langkah berikut:\n\n",
+        "Baik, ini langkah-langkahnya:\n\n",
+        "Yuk ikuti cara berikut:\n\n",
+      ]);
+      closing = pick([
+        "\n\n---\n_Semoga berhasil! Kalau ada yang bingung, tanya lagi ya. 🚀_",
+        "\n\n---\n_Dicoba dulu ya, semangat! 💪_",
+      ]);
+      break;
+
+    case "harga":
+      opening = pick([
+        "Ini informasi terkait harga dan akses:\n\n",
+        "Berikut info langganan Stickem:\n\n",
+      ]);
+      closing = pick([
+        "\n\n---\n_Ada pertanyaan lain seputar akses? Tanya saja ya! 😊_",
+      ]);
+      break;
+
+    default: // "umum"
+      opening = pick([
+        "Ini informasinya:\n\n",
+        "Berikut jawabannya:\n\n",
+      ]);
+      closing = pick([
+        "\n\n---\n_Semoga membantu! 😊_",
+        "\n\n---\n_Ada pertanyaan lain? Tanya saja ya. 🙌_",
+      ]);
+      break;
+  }
+
+  return opening + core + closing;
 }
 
 async function queryNotion(databaseId: string, notionToken: string, keyword: string) {
@@ -67,25 +154,11 @@ async function queryNotion(databaseId: string, notionToken: string, keyword: str
         property: "Pertanyaan",
         title: { contains: keyword },
       },
+      page_size: 20,
     }),
   });
   if (!res.ok) throw new Error(`Notion error ${res.status}`);
   return res.json();
-}
-
-function wrapReply(core: string): string {
-  const openings = [
-    "Oke! Untuk masalah ini, silahkan ikuti saran berikut:\n\n",
-    "Baik, ini yang perlu kamu cek:\n\n",
-    "Tenang, ini langkah yang bisa dicoba:\n\n",
-  ];
-  const closings = [
-    "\n\n---\n_Semoga saran ini membantu ya. Tetap semangat! 💪_",
-    "\n\n---\n_Semoga berhasil! Kalau masih ada kendala, tanya lagi ya. 🙌_",
-    "\n\n---\n_Yuk dicoba dulu! Semangat terus! 🚀_",
-  ];
-  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-  return pick(openings) + core + pick(closings);
 }
 
 export async function POST(request: Request) {
@@ -96,61 +169,99 @@ export async function POST(request: Request) {
     }
 
     const body = JSON.parse(textData);
-    const message = body.message || "";
-    const level = body.level || "Umum";
+    const message: string = body.message || "";
+    const level: string   = body.level   || "Umum";
 
     if (!message) {
       return NextResponse.json({ success: false, error: "Pesan kosong." }, { status: 400 });
     }
 
-    const databaseId = process.env.NOTION_DATABASE_ID;
     const notionToken = process.env.NOTION_TOKEN;
-    if (!databaseId || !notionToken) {
-      throw new Error("NOTION_DATABASE_ID atau NOTION_TOKEN belum diatur di .env.local");
+    const databaseIds = [
+      process.env.NOTION_DATABASE_ID,
+      process.env.NOTION_DATABASE_ID_2,
+    ].filter(Boolean) as string[];
+
+    if (!databaseIds.length || !notionToken) {
+      throw new Error("Environment variables belum diatur.");
     }
 
-    // Ekstrak kata kunci dari pesan user
-    let kataKunci = message;
+    // Ekstrak kata kunci
+    let kataKunci: string = message;
     if (message.includes("Masalah saya:")) {
       const match = message.match(/Masalah saya:\s*([^.]+)/);
       if (match) kataKunci = match[1].trim();
     }
 
-    const keywords = extractKeywords(kataKunci);
-    console.log("Keywords extracted:", keywords);
+    // Buat variasi query: kalimat penuh + tiap kata penting
+    const normalized = normalizeText(kataKunci);
+    const queryVariants: string[] = [
+      kataKunci,
+      normalized,
+      ...normalized.split(/\s+/).filter(w => w.length >= 3),
+    ].filter((v, i, arr) => Boolean(v) && arr.indexOf(v) === i);
 
-    let foundPage: any = null;
+    console.log("kataKunci:", kataKunci);
+    console.log("konteks:", deteksiKonteks(kataKunci));
+    console.log("queryVariants:", queryVariants);
 
-    // Coba query dengan kalimat penuh dulu (normalized + restore alias)
-    try {
-      const fullPhrase = restoreAlias(normalizeText(kataKunci).replace(/[?.,!]/g, "").trim());
-      const result = await queryNotion(databaseId, notionToken, fullPhrase);
-      if (result.results?.length > 0) foundPage = result.results[0];
-    } catch (_) {}
+    // Kumpulkan kandidat dari semua database
+    const allCandidates: { page: unknown; pertanyaan: string }[] = [];
+    const seenIds = new Set<string>();
 
-    // Kalau belum ketemu, coba tiap frasa secara berurutan (panjang → pendek)
-    if (!foundPage) {
-      for (const kw of keywords) {
-        const queryKw = restoreAlias(kw);
+    for (const dbId of databaseIds) {
+      for (const variant of queryVariants) {
         try {
-          const result = await queryNotion(databaseId, notionToken, queryKw);
-          if (result.results?.length > 0) {
-            foundPage = result.results[0];
-            break;
+          const result = await queryNotion(dbId, notionToken, variant);
+          for (const page of (result.results ?? [])) {
+            const p = page as {
+              id: string;
+              properties: {
+                Pertanyaan: { title: { plain_text: string }[] };
+                Jawaban: { rich_text: { plain_text: string }[] };
+              };
+            };
+            if (!seenIds.has(p.id)) {
+              seenIds.add(p.id);
+              const pertanyaan = p.properties["Pertanyaan"]?.title?.[0]?.plain_text ?? "";
+              allCandidates.push({ page, pertanyaan });
+            }
           }
         } catch (_) {}
       }
     }
 
+    console.log("Total candidates:", allCandidates.length);
+
+    // Scoring — pilih yang paling relevan
+    let bestPage: unknown = null;
+    let bestScore         = -1;
+
+    for (const { page, pertanyaan } of allCandidates) {
+      const score = scoreMatch(kataKunci, pertanyaan);
+      console.log(`Score ${score} — "${pertanyaan}"`);
+      if (score > bestScore) {
+        bestScore = score;
+        bestPage  = page;
+      }
+    }
+
+    console.log("Best score:", bestScore);
+
+    const MIN_SCORE = 5;
     let aiReply = "";
 
-    if (foundPage) {
-      const propertiJawaban = foundPage.properties["Jawaban"];
+    if (bestPage && bestScore >= MIN_SCORE) {
+      const p = bestPage as {
+        properties: { Jawaban: { rich_text: { plain_text: string }[] } };
+      };
+      const propertiJawaban = p.properties["Jawaban"];
       if (propertiJawaban?.rich_text?.length > 0) {
-        aiReply = wrapReply(propertiJawaban.rich_text[0].plain_text);
+        aiReply = wrapReply(propertiJawaban.rich_text[0].plain_text, kataKunci);
       } else {
         aiReply = wrapReply(
-          `Saya menemukan entri untuk **"${kataKunci}"** di database, namun kolom Jawaban masih kosong.`
+          `Saya menemukan entri untuk **"${kataKunci}"** di database, namun kolom Jawaban masih kosong.`,
+          kataKunci
         );
       }
     } else {
@@ -159,7 +270,8 @@ export async function POST(request: Request) {
         `**Saran penanganan awal:**\n` +
         `1. **Periksa Kabel:** Pastikan sambungan tidak longgar.\n` +
         `2. **Kesesuaian Pin:** Pastikan nomor pin di kode sama dengan fisik.\n` +
-        `3. Coba kata kunci lebih pendek: *Motor, Sensor, Jalur, Belok, atau OLED*.`
+        `3. Coba kata kunci lebih pendek: *Motor, Sensor, Jalur, Belok, atau OLED*.`,
+        kataKunci
       );
     }
 
@@ -167,7 +279,7 @@ export async function POST(request: Request) {
 
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : "Kesalahan tidak diketahui.";
-    console.error("Error internal backend:", errMsg);
+    console.error("Error:", errMsg);
     return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
   }
 }
