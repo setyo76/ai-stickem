@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+// ─── NORMALIZE ────────────────────────────────────────────────────────────────
 function normalizeText(text: string): string {
   if (!text) return "";
   return text
@@ -12,6 +13,7 @@ function normalizeText(text: string): string {
     .trim();
 }
 
+// ─── SCORING ──────────────────────────────────────────────────────────────────
 function scoreMatch(query: string, pertanyaan: string): number {
   const q = normalizeText(query);
   const p = normalizeText(pertanyaan);
@@ -35,112 +37,105 @@ function scoreMatch(query: string, pertanyaan: string): number {
   return score;
 }
 
-type KonteksJawaban =
-  | "salam"
-  | "definisi"
-  | "masalah"
-  | "tutorial"
-  | "harga"
-  | "umum";
+// ─── WRAP REPLY BERDASARKAN KATEGORI DATABASE ─────────────────────────────────
+function wrapReply(core: string, kategori: string): string {
+  const k = (kategori || "").toLowerCase();
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-function deteksiKonteks(pertanyaan: string): KonteksJawaban {
-  const q = (pertanyaan || "").toLowerCase().trim();
-
-  // Salam — kata pendek tanpa tanda tanya, tidak mengandung kata teknis
-  const isSalamMurni =
-    /^(halo|hai|hi|hello|hey|selamat pagi|selamat siang|selamat sore|selamat malam|pagi|siang|sore|malam|assalamualaikum|hola|yo|sup)[\s!.]*$/.test(q);
-  if (isSalamMurni) return "salam";
-
-  // Pertanyaan harga / langganan
-  if (/harga|biaya|bayar|berlangganan|beli|gratis|subscribe|free/.test(q)) return "harga";
-
-  // Pertanyaan masalah / troubleshooting
-  if (/tidak bisa|tidak jalan|tidak nyala|tidak muncul|tidak terbaca|tidak bergerak|tidak konek|tidak tersambung|error|mati|blank|rusak|gagal|kenapa|mengapa|tolong|help|bantuin|bantuan/.test(q)) return "masalah";
-
-  // Pertanyaan tutorial / cara melakukan sesuatu
-  if (/cara|langkah|bagaimana|gimana|mulai|buat|pasang|hubungkan|konek|install|setting|konfigurasi|upload|download|daftar|registrasi|login/.test(q)) return "tutorial";
-
-  // Pertanyaan definisi / pengertian
-  if (/apa itu|apa sih|apakah|pengertian|definisi|adalah|apa yang dimaksud|ceritakan|jelaskan|maksud|artinya|fungsi|kegunaan|manfaat/.test(q)) return "definisi";
-
-  return "umum";
-}
-
-function wrapReply(core: string, pertanyaan: string): string {
-  const konteks = deteksiKonteks(pertanyaan);
-
-  // Salam — tidak perlu pengantar atau closing, langsung jawab natural
-  if (konteks === "salam") {
+  // Salam / Greeting — langsung tampilkan jawaban, tanpa pengantar & closing
+  if (
+    k.includes("salam") ||
+    k.includes("greeting") ||
+    k.includes("halo") ||
+    k.includes("perkenalan")
+  ) {
     return core;
   }
 
-  let opening = "";
-  let closing  = "";
-  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-  switch (konteks) {
-
-    case "definisi":
-      opening = pick([
-        "Berikut penjelasannya:\n\n",
-        "Ini dia penjelasannya:\n\n",
-        "Baik, ini penjelasan singkatnya:\n\n",
-      ]);
-      closing = pick([
-        "\n\n---\n_Semoga penjelasan ini membantu ya! 😊_",
-        "\n\n---\n_Ada yang ingin ditanyakan lebih lanjut? 🙌_",
-      ]);
-      break;
-
-    case "masalah":
-      opening = pick([
-        "Tenang, ini yang perlu dicek:\n\n",
-        "Oke, ini langkah yang bisa dicoba:\n\n",
-        "Jangan panik! Coba ikuti langkah berikut:\n\n",
-      ]);
-      closing = pick([
-        "\n\n---\n_Semoga masalahnya teratasi ya. Tetap semangat! 💪_",
-        "\n\n---\n_Kalau masih ada kendala, tanya lagi ya. 🙌_",
-      ]);
-      break;
-
-    case "tutorial":
-      opening = pick([
-        "Oke! Silahkan ikuti langkah berikut:\n\n",
-        "Baik, ini langkah-langkahnya:\n\n",
-        "Yuk ikuti cara berikut:\n\n",
-      ]);
-      closing = pick([
-        "\n\n---\n_Semoga berhasil! Kalau ada yang bingung, tanya lagi ya. 🚀_",
-        "\n\n---\n_Dicoba dulu ya, semangat! 💪_",
-      ]);
-      break;
-
-    case "harga":
-      opening = pick([
-        "Ini informasi terkait harga dan akses:\n\n",
-        "Berikut info langganan Stickem:\n\n",
-      ]);
-      closing = pick([
-        "\n\n---\n_Ada pertanyaan lain seputar akses? Tanya saja ya! 😊_",
-      ]);
-      break;
-
-    default: // "umum"
-      opening = pick([
-        "Ini informasinya:\n\n",
-        "Berikut jawabannya:\n\n",
-      ]);
-      closing = pick([
-        "\n\n---\n_Semoga membantu! 😊_",
-        "\n\n---\n_Ada pertanyaan lain? Tanya saja ya. 🙌_",
-      ]);
-      break;
+  // Pilih Masalah Cepat — troubleshooting hardware/robot
+  if (k.includes("pilih masalah")) {
+    const opening = pick([
+      "Tenang, ini yang perlu dicek:\n\n",
+      "Jangan panik! Coba langkah berikut:\n\n",
+      "Oke, ini yang harus kamu lakukan:\n\n",
+    ]);
+    const closing = pick([
+      "\n\n---\n_Semoga masalahnya teratasi ya. Tetap semangat! 💪_",
+      "\n\n---\n_Kalau masih ada kendala, tanya lagi ya. 🙌_",
+    ]);
+    return opening + core + closing;
   }
 
+  // Stickem Academy — info & definisi platform
+  if (k.includes("academy")) {
+    const opening = pick([
+      "Berikut penjelasannya:\n\n",
+      "Ini dia info tentang Stickem Academy:\n\n",
+      "Baik, ini penjelasan singkatnya:\n\n",
+    ]);
+    const closing = pick([
+      "\n\n---\n_Semoga penjelasan ini membantu ya! 😊_",
+      "\n\n---\n_Ada yang ingin ditanyakan lebih lanjut? 🙌_",
+    ]);
+    return opening + core + closing;
+  }
+
+  // Tutorial langkah-langkah
+  if (
+    k.includes("langkah awal") ||
+    k.includes("menghubungkan") ||
+    k.includes("coding blocks") ||
+    k.includes("mengenal coding") ||
+    k.includes("membuat program") ||
+    k.includes("square the box")
+  ) {
+    const opening = pick([
+      "Oke! Silahkan ikuti langkah berikut:\n\n",
+      "Yuk ikuti cara berikut:\n\n",
+      "Baik, ini langkah-langkahnya:\n\n",
+    ]);
+    const closing = pick([
+      "\n\n---\n_Semoga berhasil! Kalau ada yang bingung, tanya lagi ya. 🚀_",
+      "\n\n---\n_Dicoba dulu ya, semangat! 💪_",
+    ]);
+    return opening + core + closing;
+  }
+
+  // Materi pengetahuan / edukasi
+  if (
+    k.includes("steam") ||
+    k.includes("manfaat") ||
+    k.includes("robot mechanisms") ||
+    k.includes("basic robot") ||
+    k.includes("electronics") ||
+    k.includes("problem solving") ||
+    k.includes("masa depan")
+  ) {
+    const opening = pick([
+      "Berikut informasinya:\n\n",
+      "Ini penjelasannya:\n\n",
+      "Baik, ini yang perlu kamu tahu:\n\n",
+    ]);
+    const closing = pick([
+      "\n\n---\n_Semoga bermanfaat! 😊_",
+      "\n\n---\n_Ada pertanyaan lain? Tanya saja ya. 🙌_",
+    ]);
+    return opening + core + closing;
+  }
+
+  // Default — umum
+  const opening = pick([
+    "Berikut jawabannya:\n\n",
+    "Ini informasinya:\n\n",
+  ]);
+  const closing = pick([
+    "\n\n---\n_Semoga membantu! 😊_",
+    "\n\n---\n_Ada pertanyaan lain? Tanya saja ya. 🙌_",
+  ]);
   return opening + core + closing;
 }
 
+// ─── QUERY NOTION ─────────────────────────────────────────────────────────────
 async function queryNotion(databaseId: string, notionToken: string, keyword: string) {
   const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
     method: "POST",
@@ -161,6 +156,7 @@ async function queryNotion(databaseId: string, notionToken: string, keyword: str
   return res.json();
 }
 
+// ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const textData = await request.text();
@@ -202,11 +198,11 @@ export async function POST(request: Request) {
     ].filter((v, i, arr) => Boolean(v) && arr.indexOf(v) === i);
 
     console.log("kataKunci:", kataKunci);
-    console.log("konteks:", deteksiKonteks(kataKunci));
     console.log("queryVariants:", queryVariants);
 
     // Kumpulkan kandidat dari semua database
-    const allCandidates: { page: unknown; pertanyaan: string }[] = [];
+    type Candidate = { page: unknown; pertanyaan: string; kategori: string };
+    const allCandidates: Candidate[] = [];
     const seenIds = new Set<string>();
 
     for (const dbId of databaseIds) {
@@ -218,13 +214,15 @@ export async function POST(request: Request) {
               id: string;
               properties: {
                 Pertanyaan: { title: { plain_text: string }[] };
-                Jawaban: { rich_text: { plain_text: string }[] };
+                Jawaban:    { rich_text: { plain_text: string }[] };
+                Kategori:   { select: { name: string } };
               };
             };
             if (!seenIds.has(p.id)) {
               seenIds.add(p.id);
-              const pertanyaan = p.properties["Pertanyaan"]?.title?.[0]?.plain_text ?? "";
-              allCandidates.push({ page, pertanyaan });
+              const pertanyaan = p.properties["Pertanyaan"]?.title?.[0]?.plain_text  ?? "";
+              const kategori   = p.properties["Kategori"]?.select?.name              ?? "";
+              allCandidates.push({ page, pertanyaan, kategori });
             }
           }
         } catch (_) {}
@@ -234,19 +232,21 @@ export async function POST(request: Request) {
     console.log("Total candidates:", allCandidates.length);
 
     // Scoring — pilih yang paling relevan
-    let bestPage: unknown = null;
-    let bestScore         = -1;
+    let bestPage:     unknown = null;
+    let bestScore:    number  = -1;
+    let bestKategori: string  = "";
 
-    for (const { page, pertanyaan } of allCandidates) {
+    for (const { page, pertanyaan, kategori } of allCandidates) {
       const score = scoreMatch(kataKunci, pertanyaan);
-      console.log(`Score ${score} — "${pertanyaan}"`);
+      console.log(`Score ${score} [${kategori}] — "${pertanyaan}"`);
       if (score > bestScore) {
-        bestScore = score;
-        bestPage  = page;
+        bestScore    = score;
+        bestPage     = page;
+        bestKategori = kategori;
       }
     }
 
-    console.log("Best score:", bestScore);
+    console.log("Best score:", bestScore, "| Kategori:", bestKategori);
 
     const MIN_SCORE = 5;
     let aiReply = "";
@@ -257,11 +257,11 @@ export async function POST(request: Request) {
       };
       const propertiJawaban = p.properties["Jawaban"];
       if (propertiJawaban?.rich_text?.length > 0) {
-        aiReply = wrapReply(propertiJawaban.rich_text[0].plain_text, kataKunci);
+        aiReply = wrapReply(propertiJawaban.rich_text[0].plain_text, bestKategori);
       } else {
         aiReply = wrapReply(
           `Saya menemukan entri untuk **"${kataKunci}"** di database, namun kolom Jawaban masih kosong.`,
-          kataKunci
+          bestKategori
         );
       }
     } else {
@@ -271,7 +271,7 @@ export async function POST(request: Request) {
         `1. **Periksa Kabel:** Pastikan sambungan tidak longgar.\n` +
         `2. **Kesesuaian Pin:** Pastikan nomor pin di kode sama dengan fisik.\n` +
         `3. Coba kata kunci lebih pendek: *Motor, Sensor, Jalur, Belok, atau OLED*.`,
-        kataKunci
+        "umum"
       );
     }
 
