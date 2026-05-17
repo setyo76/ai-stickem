@@ -104,7 +104,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
                 type="button"
                 disabled={isLoading}
                 onClick={() => handleSendMessage(problem)}
-                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 text-left md:text-center max-w-full disabled:opacity-50"
+                className="bg-gray-50/80 backdrop-blur-sm hover:bg-blue-600 border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-white cursor-pointer px-3 py-2 md:px-5 md:py-2.5 rounded-2xl md:rounded-full text-[11px] md:text-xs font-semibold transition-all shadow-sm active:scale-95 text-left md:text-center max-w-full disabled:opacity-50"
               >
                 {problem}
               </button>
@@ -121,7 +121,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-400 truncate">
-              Notion FAQ Assistant — {level ?? "Umum"}
+              Stickem Assistant — {level ?? "Umum"}
             </span>
           </div>
           <button
@@ -130,7 +130,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               setMessages([]);
               triggeredRef.current = null;
             }}
-            className="text-[10px] font-bold text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg transition-all uppercase shrink-0"
+            className="text-[10px] font-bold text-gray-500 hover:text-red-400 cursor-pointer px-2 py-1 rounded-lg transition-all uppercase shrink-0"
           >
             Bersihkan
           </button>
@@ -200,7 +200,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white shrink-0"
+            className="bg-blue-600 hover:bg-blue-500 cursor-pointer  disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white shrink-0"
           >
             {isLoading ? '...' : 'KIRIM'}
           </button>

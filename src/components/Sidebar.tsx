@@ -49,7 +49,7 @@ export default function Sidebar() {
               <button
                 key={key}
                 onClick={() => setActivePage(key)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left text-white/80 hover:bg-white/15 hover:text-white"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left text-white/80 hover:bg-white/15 hover:text-white cursor-pointer"
               >
                 <span>{icon}</span>
                 <span>{label}</span>
