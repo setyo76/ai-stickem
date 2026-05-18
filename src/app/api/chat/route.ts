@@ -1,16 +1,37 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 export const runtime = "nodejs";
+
+// Fungsi pembantu untuk membuat instance AI secara aman saat dibutuhkan
+function getGeminiClient(): GoogleGenAI {
+  const aiKey = process.env.GEMINI_API_KEY || "";
+  if (!aiKey) {
+    throw new Error("GEMINI_API_KEY belum dikonfigurasi di environment variables.");
+  }
+  return new GoogleGenAI({ apiKey: aiKey });
+}
 
 // ─── NORMALIZE ────────────────────────────────────────────────────────────────
 function normalizeText(text: string): string {
   if (!text) return "";
-  return text
-    .toLowerCase()
-    .replace(/stick\s*['\u2018\u2019`]?\s*em/gi, "stickem")
-    .replace(/['\u2018\u2019`]/g, "'")
-    .replace(/[?.,!]/g, "")
-    .trim();
+
+  let lowText = text.toLowerCase();
+
+  // Bersihkan variasi penulisan stick'em
+  lowText = lowText.replace("stick'em", "stickem");
+  lowText = lowText.replace("stick em", "stickem");
+  lowText = lowText.replace("stick`em", "stickem");
+
+  // Bersihkan tanda petik miring bawaan perangkat mobile / iOS
+  lowText = lowText.replace("‘", "'");
+  lowText = lowText.replace("’", "'");
+  lowText = lowText.replace("`", "'");
+
+  // Hapus tanda baca umum agar scoring akurat
+  lowText = lowText.replace(/[?.,!]/g, "");
+
+  return lowText.trim();
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
@@ -42,7 +63,6 @@ function wrapReply(core: string, kategori: string): string {
   const k = (kategori || "").toLowerCase();
   const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  // Salam / Greeting — langsung tampilkan jawaban, tanpa pengantar & closing
   if (
     k.includes("salam") ||
     k.includes("greeting") ||
@@ -52,7 +72,6 @@ function wrapReply(core: string, kategori: string): string {
     return core;
   }
 
-  // Pilih Masalah Cepat — troubleshooting hardware/robot
   if (k.includes("pilih masalah")) {
     const opening = pick([
       "Tenang, ini yang perlu dicek:\n\n",
@@ -66,7 +85,6 @@ function wrapReply(core: string, kategori: string): string {
     return opening + core + closing;
   }
 
-  // Stickem Academy — info & definisi platform
   if (k.includes("academy")) {
     const opening = pick([
       "Berikut penjelasannya:\n\n",
@@ -80,7 +98,6 @@ function wrapReply(core: string, kategori: string): string {
     return opening + core + closing;
   }
 
-  // Tutorial langkah-langkah
   if (
     k.includes("langkah awal") ||
     k.includes("menghubungkan") ||
@@ -101,7 +118,6 @@ function wrapReply(core: string, kategori: string): string {
     return opening + core + closing;
   }
 
-  // Materi pengetahuan / edukasi
   if (
     k.includes("steam") ||
     k.includes("manfaat") ||
@@ -123,7 +139,6 @@ function wrapReply(core: string, kategori: string): string {
     return opening + core + closing;
   }
 
-  // Default — umum
   const opening = pick([
     "Berikut jawabannya:\n\n",
     "Ini informasinya:\n\n",
@@ -156,6 +171,31 @@ async function queryNotion(databaseId: string, notionToken: string, keyword: str
   return res.json();
 }
 
+// ─── CALL GOOGLE AI STUDIO (FALLBACK) ─────────────────────────────────────────
+async function generateGeminiReply(message: string, level: string): Promise<string> {
+  const ai = getGeminiClient();
+
+  const systemInstruction = 
+    `Kamu adalah AI Debugger Asisten untuk program Stick'Em (Holiday Program Juni 2026) di sekolah Ora et Labora.\n` +
+    `Siswa saat ini berada di kelas/level: ${level}.\n\n` +
+    `Tugasmu:\n` +
+    `1. Berikan solusi pemecahan masalah (troubleshooting) secara logis, ramah anak, terstruktur, dan edukatif.\n` +
+    `2. Fokus pada pengecekan hardware (kabel, baterai, pin servo/motor, shield) dan logika block coding.\n` +
+    `3. Jawab menggunakan format Markdown yang rapi (gunakan bold untuk poin penting, list, atau inline code untuk nama komponen).\n` +
+    `4. Jangan memberikan jawaban yang terlalu panjang bertele-tele. Jaga agar tetap padat dan mudah dipahami anak sekolah.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: message,
+    config: {
+      systemInstruction: systemInstruction,
+      temperature: 0.4,
+    }
+  });
+
+  return response.text || "Maaf, AI tidak dapat menyusun jawaban saat ini.";
+}
+
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
@@ -179,17 +219,15 @@ export async function POST(request: Request) {
     ].filter(Boolean) as string[];
 
     if (!databaseIds.length || !notionToken) {
-      throw new Error("Environment variables belum diatur.");
+      throw new Error("Environment variables untuk Notion belum diatur.");
     }
 
-    // Ekstrak kata kunci
     let kataKunci: string = message;
     if (message.includes("Masalah saya:")) {
       const match = message.match(/Masalah saya:\s*([^.]+)/);
       if (match) kataKunci = match[1].trim();
     }
 
-    // Buat variasi query: kalimat penuh + tiap kata penting
     const normalized = normalizeText(kataKunci);
     const queryVariants: string[] = [
       kataKunci,
@@ -197,10 +235,8 @@ export async function POST(request: Request) {
       ...normalized.split(/\s+/).filter(w => w.length >= 3),
     ].filter((v, i, arr) => Boolean(v) && arr.indexOf(v) === i);
 
-    console.log("kataKunci:", kataKunci);
-    console.log("queryVariants:", queryVariants);
-
-    // Kumpulkan kandidat dari semua database
+    console.log("kataKunci untuk query:", kataKunci);
+    
     type Candidate = { page: unknown; pertanyaan: string; kategori: string };
     const allCandidates: Candidate[] = [];
     const seenIds = new Set<string>();
@@ -225,20 +261,18 @@ export async function POST(request: Request) {
               allCandidates.push({ page, pertanyaan, kategori });
             }
           }
-        } catch (_) {}
+        } catch {
+          // Menggunakan blok kosong tanpa menyertakan parameter `error` atau `_` yang melanggar aturan ESLint
+        }
       }
     }
 
-    console.log("Total candidates:", allCandidates.length);
-
-    // Scoring — pilih yang paling relevan
     let bestPage:     unknown = null;
     let bestScore:    number  = -1;
     let bestKategori: string  = "";
 
     for (const { page, pertanyaan, kategori } of allCandidates) {
       const score = scoreMatch(kataKunci, pertanyaan);
-      console.log(`Score ${score} [${kategori}] — "${pertanyaan}"`);
       if (score > bestScore) {
         bestScore    = score;
         bestPage     = page;
@@ -246,40 +280,49 @@ export async function POST(request: Request) {
       }
     }
 
-    console.log("Best score:", bestScore, "| Kategori:", bestKategori);
+    console.log("Best Notion Score:", bestScore, "| Kategori:", bestKategori);
 
     const MIN_SCORE = 5;
     let aiReply = "";
 
     if (bestPage && bestScore >= MIN_SCORE) {
+      console.log("👉 Menggunakan jawaban dari Database Notion.");
       const p = bestPage as {
         properties: { Jawaban: { rich_text: { plain_text: string }[] } };
       };
       const propertiJawaban = p.properties["Jawaban"];
+      
       if (propertiJawaban?.rich_text?.length > 0) {
         aiReply = wrapReply(propertiJawaban.rich_text[0].plain_text, bestKategori);
       } else {
+        console.log("Kolom jawaban Notion kosong. Mengalihkan ke Gemini...");
+        const geminiReply = await generateGeminiReply(message, level);
+        aiReply = wrapReply(geminiReply, "AI-Studio-Fallback");
+      }
+    } 
+    else {
+      console.log("👉 Data tidak ditemukan di Notion. Mengalihkan query ke Google AI Studio...");
+      try {
+        const geminiReply = await generateGeminiReply(message, level);
+        aiReply = wrapReply(geminiReply, "AI-Studio-Fallback");
+      } catch (geminiError) {
+        console.error("Gagal memanggil AI Studio:", geminiError);
         aiReply = wrapReply(
-          `Saya menemukan entri untuk **"${kataKunci}"** di database, namun kolom Jawaban masih kosong.`,
-          bestKategori
+          `Sistem belum menemukan FAQ untuk kendala **"${kataKunci}"** di kelas **${level}**.\n\n` +
+          `**Saran penanganan awal:**\n` +
+          `1. **Periksa Kabel:** Pastikan sambungan tidak ada yang longgar.\n` +
+          `2. **Kesesuaian Pin:** Pastikan nomor pin di kode sama dengan fisik.\n` +
+          `3. Coba ketik kata kunci ringkas saja: *Motor, Sensor, Jalur, Belok, atau OLED*.`,
+          "umum"
         );
       }
-    } else {
-      aiReply = wrapReply(
-        `Sistem belum menemukan FAQ untuk kendala **"${kataKunci}"** di kelas **${level}**.\n\n` +
-        `**Saran penanganan awal:**\n` +
-        `1. **Periksa Kabel:** Pastikan sambungan tidak longgar.\n` +
-        `2. **Kesesuaian Pin:** Pastikan nomor pin di kode sama dengan fisik.\n` +
-        `3. Coba kata kunci lebih pendek: *Motor, Sensor, Jalur, Belok, atau OLED*.`,
-        "umum"
-      );
     }
 
-    return NextResponse.json({ success: true, message: aiReply });
+    return NextResponse.json({ success: true, reply: aiReply });
 
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : "Kesalahan tidak diketahui.";
-    console.error("Error:", errMsg);
+    console.error("Error global route:", errMsg);
     return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
   }
 }

@@ -38,15 +38,16 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
       
       const data = await response.json();
 
+      // PERBAIKAN UTAMA: Menggunakan data.reply sesuai dengan payload dari backend route.ts
       if (response.ok && data.success) {
-        setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+        setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
       } else {
         setMessages(prev => [...prev, { 
           role: "assistant", 
-          content: `⚠️ **Gagal menyimpan:** ${data.error || "Terjadi kesalahan pada server."}` 
+          content: `⚠️ **Gagal memuat jawaban:** ${data.error || "Terjadi kesalahan pada server."}` 
         }]);
       }
-    } catch (_error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: "assistant",
         content: "Waduh, sepertinya koneksi jaringan sedang bermasalah. Coba lagi ya!"
@@ -146,15 +147,15 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
               key={i}
               className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full min-w-0`}
             >
-              <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl break-words overflow-hidden shrink ${
+              <div className={`max-w-[85%] p-4 md:p-5 rounded-2xl text-sm leading-relaxed shadow-xl wrap-break-word overflow-hidden shrink ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-[#2a2a2a] text-gray-200 border border-white/5 rounded-tl-none'
               }`}>
                 {m.role === 'user' ? (
-                  <span className="break-words">{m.content}</span>
+                  <span className="wrap-break-word">{m.content}</span>
                 ) : (
-                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 break-words
+                  <div className="prose prose-invert prose-sm max-w-none w-full min-w-0 -wrap-break-word
                     prose-strong:text-amber-400 prose-p:my-2 prose-li:my-1
                     prose-code:text-emerald-400 prose-code:bg-black/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:break-words
                     prose-pre:bg-black/50 prose-pre:p-3 prose-pre:rounded-xl prose-pre:overflow-x-auto prose-pre:max-w-full
@@ -182,9 +183,9 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           onSubmit={(e) => {
             e.preventDefault();
             const form = e.currentTarget;
-            const input = form.elements.namedItem("input") as HTMLInputElement;
+            const input = form.elements.namedItem("input") as HTMLInputElement | null;
             if (input && input.value.trim()) {
-              handleSendMessage(input.value);
+              handleSendMessage(input.value.trim());
               input.value = "";
             }
           }}
@@ -200,7 +201,7 @@ export default function ChatBox({ level, initialProblem }: ChatBoxProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-500 cursor-pointer  disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white shrink-0"
+            className="bg-blue-600 hover:bg-blue-500 cursor-pointer disabled:bg-gray-800 px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs tracking-widest transition-all shadow-lg active:scale-95 text-white shrink-0"
           >
             {isLoading ? '...' : 'KIRIM'}
           </button>
